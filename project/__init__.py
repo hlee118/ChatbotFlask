@@ -14,6 +14,8 @@ import re
 from konlpy.tag import Twitter
 import pickle
 import time
+import wikipediaapi
+
 
 # 태그 단어
 PAD = "<PADDING>"   # 패딩
@@ -34,6 +36,7 @@ DECODER_TARGET = 2
 
 max_sequences = 30
 RE_FILTER = re.compile("[.,!?\"':;~()]")
+tagger = Twitter()
 
 app = Flask(__name__)
 
@@ -89,7 +92,6 @@ def convert_index_to_text(indexs):
 
 # 형태소분석 함수
 def pos_tag(sentence):
-    tagger = Twitter()
     sentence = re.sub(RE_FILTER, "", sentence)
     sentence = " ".join(tagger.morphs(sentence))
     return sentence
@@ -124,10 +126,24 @@ def predict(query):
     sentence = convert_index_to_text(indexs)
     return sentence
 
-@app.route('/', methods=['POST'])
-def index():
+@app.route('/seq2seq', methods=['POST'])
+def seq2seq():
     query = request.values.get('query', 'default')
-    print("Q: {0}".format(query))
-    sentence = predict(query)
-    print("A: {0}".format(sentence))
-    return sentence
+    result = predict(query)
+    return result
+
+@app.route('/nouns', methods=['POST'])
+def nouns():
+    query = request.values.get('query', 'default')
+    query = tagger.nouns(query)
+    query = ' '.join(query)
+    return query
+
+@app.route('/wiki', methods=['POST'])
+def wiki():
+    query = request.values.get('query', 'default')
+    query = tagger.nouns(query)
+    wiki_ko = wikipediaapi.Wikipedia('ko')
+    page_py = wiki_ko.page(query[0])
+    result = page_py.summary[0:] #문서 검색 내용
+    return result
