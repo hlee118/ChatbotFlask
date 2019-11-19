@@ -15,7 +15,16 @@ from konlpy.tag import Twitter
 import pickle
 import time
 import wikipediaapi
+import pymysql
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from numpy import dot
+from numpy.linalg import norm
+import numpy as np
+from db import info
 
+def cos_sim(A, B):
+    return dot(A, B) / (norm(A) * norm(B))
 
 # 태그 단어
 PAD = "<PADDING>"   # 패딩
@@ -126,6 +135,40 @@ def predict(query):
     sentence = convert_index_to_text(indexs)
     return sentence
 
+@app.route('/dobby', methods=['POST'])
+def dobby():
+    query = request.values.get('query', 'default')
+    conn = pymysql.connect(host=info.host, user=info.user, password=info.password, db=info.db, charset=info.charset)
+    curs = conn.cursor()
+
+    tagger = Twitter()
+    query = tagger.morphs(query)
+    query = [' '.join(query)]
+
+    sql = "SELECT * FROM dobby;"
+    curs.execute(sql)
+    rows = curs.fetchall()
+
+    data = pd.DataFrame(rows, columns=['id', 'question', 'prep_question', 'answer'])
+    prep_question = list(data["prep_question"])
+    prep_question = query + prep_question
+
+    tfidfv = TfidfVectorizer().fit(prep_question)
+    tf_idf_mat = tfidfv.transform(prep_question).toarray()
+
+    doc0 = np.array(tf_idf_mat[0])
+    tf_idf_mat = tf_idf_mat[1:]
+    max_similarity = -1
+    max_similarity_index = -1
+    for idx, doc in enumerate(tf_idf_mat):
+        doc = np.array(doc)
+        if max_similarity < cos_sim(doc0, doc):
+            max_similarity = cos_sim(doc0, doc)
+            max_similarity_index = idx
+
+    result = rows[max_similarity_index][3]
+    return result
+
 @app.route('/seq2seq', methods=['POST'])
 def seq2seq():
     query = request.values.get('query', 'default')
@@ -148,9 +191,15 @@ def nouns():
 
 @app.route('/wiki', methods=['POST'])
 def wiki():
+    error_result = "대답을 모르겠습니다"
     query = request.values.get('query', 'default')
     query = tagger.nouns(query)
+    if len(query) == 0:
+        return error_result
+
     wiki_ko = wikipediaapi.Wikipedia('ko')
     page_py = wiki_ko.page(query[0])
-    result = page_py.summary[0:] #문서 검색 내용
-    return result
+    if not page_py.exists():
+        return error_result
+    else:
+        return page_py.summary[0:]
