@@ -148,6 +148,7 @@ def dobby():
     sql = "SELECT * FROM dobby;"
     curs.execute(sql)
     rows = curs.fetchall()
+    rows = list(rows)
 
     data = pd.DataFrame(rows, columns=['id', 'question', 'prep_question', 'answer'])
     prep_question = list(data["prep_question"])
