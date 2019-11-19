@@ -132,6 +132,13 @@ def seq2seq():
     result = predict(query)
     return result
 
+@app.route('/morphs', methods=['POST'])
+def morphs():
+    query = request.values.get('query', 'default')
+    query = tagger.morphs(query)
+    query = ' '.join(query)
+    return query
+
 @app.route('/nouns', methods=['POST'])
 def nouns():
     query = request.values.get('query', 'default')
