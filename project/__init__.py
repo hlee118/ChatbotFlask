@@ -150,6 +150,7 @@ def dobby():
     rows = curs.fetchall()
     rows = list(rows)
 
+    # TF-IDF
     data = pd.DataFrame(rows, columns=['id', 'question', 'prep_question', 'answer'])
     prep_question = list(data["prep_question"])
     prep_question = query + prep_question
@@ -198,8 +199,12 @@ def wiki():
     if len(query) == 0:
         return error_result
 
+    weight = np.array(range(1, len(query) + 1))
+    weight = np.flip(weight)
+    weight = weight / sum(weight)
+    random_query = np.random.choice(query, 1, p=weight)
     wiki_ko = wikipediaapi.Wikipedia('ko')
-    page_py = wiki_ko.page(query[0])
+    page_py = wiki_ko.page(random_query[0])
     if not page_py.exists():
         return error_result
     else:
